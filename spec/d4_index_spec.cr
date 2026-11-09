@@ -53,6 +53,24 @@ private def secondary_record(left : Int32, length : Int32, value : Int32) : Byte
   record
 end
 
+private def embedded_index_blobs(path : String) : Hash(String, Bytes)
+  D4.open(path) do |file|
+    root = D4::Format::Directory.open_root(file.source, file.options.max_metadata_bytes)
+    indexed = root.entry(".index", 1_u8)
+    directory = D4::Format::Directory.open(file.source, indexed.offset, file.options.max_metadata_bytes)
+    blobs = Hash(String, Bytes).new
+    directory.entries.each do |entry|
+      entry.blob?.should be_true
+      entry.offset.should be >= indexed.offset + D4::Format::DIRECTORY_FRAME_SIZE
+      (entry.offset + entry.size).should be <= indexed.offset + indexed.size
+      bytes = Bytes.new(entry.size.to_i)
+      file.source.read_exact_at(entry.offset, bytes)
+      blobs[entry.name] = bytes
+    end
+    blobs
+  end
+end
+
 private def rewrite_sfi_with_legacy_leading_flag(path : String) : Nil
   source = D4::LocalSource.new(path)
   entry_offset = 0_i64
@@ -423,6 +441,45 @@ describe "embedded D4 indexes" do
     ensure
       temporary.close unless temporary.closed?
       File.delete(path) if File.exists?(path)
+    end
+  end
+
+  [
+    {"adds SUM while preserving SFI", "rust-input-10nt.d4", [D4::IndexKind::SecondaryFrames], D4::IndexKind::Sum, "secondary_frame_index"},
+    {"adds SFI while preserving SUM", "rust-input-10nt.d4", [D4::IndexKind::Sum], D4::IndexKind::SecondaryFrames, "sum_index"},
+    {"rebuilds SUM while preserving Rust SFI", "rust-indexed-sparse-100k.d4", ([] of D4::IndexKind), D4::IndexKind::Sum, "secondary_frame_index"},
+    {"rebuilds SFI while preserving Rust SUM", "rust-indexed-sparse-100k.d4", ([] of D4::IndexKind), D4::IndexKind::SecondaryFrames, "sum_index"},
+  ].each do |description, fixture, initial, requested, preserved|
+    it description do
+      temporary = File.tempfile("d4-index-partial", ".d4")
+      path = temporary.path
+      begin
+        File.open(File.join(__DIR__, "fixtures", fixture), "rb") { |input| IO.copy(input, temporary) }
+        temporary.close
+        D4.build_indexes(path, kinds: initial) unless initial.empty?
+        original_blobs = embedded_index_blobs(path)
+        expected_sum = D4.open(path) { |file| file.sum("chr", index: D4::IndexPolicy::Scan) }
+        expected_value = D4.open(path) { |file| file.value("chr", file.chromosomes.first.size - 1) }
+
+        2.times do
+          previous_size = File.size(path)
+          D4.build_indexes(path, kinds: [requested])
+          blobs = embedded_index_blobs(path)
+          blobs[preserved].should eq(original_blobs[preserved])
+          D4.open(path) do |file|
+            root = D4::Format::Directory.open_root(file.source, file.options.max_metadata_bytes)
+            root.entry(".index", 1_u8).offset.should eq(previous_size)
+            file.default_track.has_index?(D4::IndexKind::SecondaryFrames).should be_true
+            file.default_track.has_index?(D4::IndexKind::Sum).should be_true
+            file.sum("chr", index: D4::IndexPolicy::Require).should eq(expected_sum)
+            file.sum("chr", index: D4::IndexPolicy::Scan).should eq(expected_sum)
+            file.value("chr", file.chromosomes.first.size - 1).should eq(expected_value)
+          end
+        end
+      ensure
+        temporary.close unless temporary.closed?
+        File.delete(path) if File.exists?(path)
+      end
     end
   end
 

@@ -66,7 +66,9 @@ module D4
           index_items = old_entries.reject do |entry|
             (entry.name == "secondary_frame_index" && kinds.includes?(IndexKind::SecondaryFrames)) ||
               (entry.name == "sum_index" && kinds.includes?(IndexKind::Sum))
-          end.map { |entry| DirectoryEncoder::Item.new(entry.kind, entry.name, entry.offset, entry.size) }
+          end.map do |entry|
+            copy_index_entry(file.source, entry, output, control)
+          end
 
           if kinds.includes?(IndexKind::SecondaryFrames)
             offset = output.pos.to_i64
@@ -90,6 +92,25 @@ module D4
           output.flush
         end
       end
+    end
+
+    private def self.copy_index_entry(source : Source, entry : Format::Entry, output : IO,
+                                      control : WriteControl) : DirectoryEncoder::Item
+      raise UnsupportedFeatureError.new("cannot preserve non-blob index entry #{entry.name.inspect}") unless entry.blob?
+      # Directory offsets are unsigned, so retained blobs must also follow the
+      # new directory. SFI addresses remain relative to the unchanged .stab.
+      offset = output.pos.to_i64
+      copied = 0_i64
+      buffer = Bytes.new(Math.min(entry.size, 65_536_i64).to_i)
+      while copied < entry.size
+        control.check!
+        count = Math.min(entry.size - copied, buffer.size).to_i
+        chunk = buffer[0, count]
+        source.read_exact_at(entry.offset + copied, chunk)
+        output.write(chunk)
+        copied += count
+      end
+      DirectoryEncoder::Item.new(entry.kind, entry.name, offset, entry.size)
     end
 
     private def self.write_sfi(file : D4::File, directory : Format::Directory, output : IO,
