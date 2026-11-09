@@ -765,6 +765,9 @@ module D4
       def initialize(@kind : UInt8, @name : String, @offset : Int64, @size : Int64); end
 
       def append_to(output : Array(UInt8), base : Int64) : Nil
+        raise ArgumentError.new("directory base must be non-negative") if base < 0
+        raise ArgumentError.new("directory entry precedes its directory") if @offset < base
+        raise ArgumentError.new("directory entry size is invalid") if @size < 0 || @size > Int64::MAX - @offset
         output << 1_u8 << @kind
         append_u64(output, (@offset - base).to_u64)
         append_u64(output, @size.to_u64)

@@ -1,6 +1,14 @@
 require "./spec_helper"
 
 describe "D4 read coordinate boundaries" do
+  it "rejects overflowing binary field offsets as malformed data" do
+    bytes = Bytes.new(8)
+    expect_raises(D4::FormatError, /truncated binary field/) { D4::Format::Endian.u16_le(bytes, Int32::MAX) }
+    expect_raises(D4::FormatError, /truncated binary field/) { D4::Format::Endian.u32_le(bytes, Int32::MAX) }
+    expect_raises(D4::FormatError, /truncated binary field/) { D4::Format::Endian.u64_le(bytes, Int32::MAX) }
+    D4::Format::Endian.u64_le(bytes, 0).should eq(0_u64)
+  end
+
   it "normalizes unsigned and wide public coordinates to ArgumentError" do
     expect_raises(ArgumentError, /region coordinate/) do
       D4::Region.new("chr", UInt64::MAX...UInt64::MAX)

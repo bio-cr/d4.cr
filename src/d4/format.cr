@@ -35,6 +35,8 @@ module D4
 
     class FrameStream
       @max_frame : Int64
+      # Physical location of the payload most recently returned by next_payload.
+      getter payload_offset : Int64 = 0_i64
 
       def initialize(@source : Source, @offset : Int64, @size : Int64, @limit : Int64, max_frame : Int64? = nil)
         @max_frame = max_frame || @limit
@@ -56,6 +58,7 @@ module D4
         @buffer = Bytes.new(@size.to_i) if @buffer.size < @size
         frame = @buffer[0, @size.to_i]
         @source.read_exact_at(@offset, frame)
+        @payload_offset = @offset + FRAME_HEADER_SIZE
         link = Endian.i64_le(frame, 0)
         linked_size = Endian.u64_le(frame, 8)
         if link == 0
@@ -182,7 +185,7 @@ module D4
       end
 
       private def self.check_bytes(bytes : Bytes, offset : Int32, count : Int32) : Nil
-        raise FormatError.new("truncated binary field") if offset < 0 || count < 0 || offset + count > bytes.size
+        raise FormatError.new("truncated binary field") if offset < 0 || count < 0 || offset > bytes.size || count > bytes.size - offset
       end
     end
   end

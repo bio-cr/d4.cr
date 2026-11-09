@@ -1,6 +1,24 @@
 require "./spec_helper"
 
 describe "D4 writer coordinate boundaries" do
+  it "rejects unrepresentable directory entries before encoding any bytes" do
+    [
+      {-1_i64, 0_i64, 0_i64},
+      {10_i64, 9_i64, 0_i64},
+      {0_i64, 10_i64, -1_i64},
+      {0_i64, Int64::MAX, 1_i64},
+    ].each do |base, offset, size|
+      output = [42_u8]
+      item = D4::DirectoryEncoder::Item.new(2_u8, "blob", offset, size)
+      expect_raises(ArgumentError) { item.append_to(output, base) }
+      output.should eq([42_u8])
+    end
+    item = D4::DirectoryEncoder::Item.new(2_u8, "blob", Int64::MAX, 0_i64)
+    output = [] of UInt8
+    item.append_to(output, 0_i64)
+    D4::Format::Endian.u64_le(D4::Format.bytes(output), 2).should eq(Int64::MAX.to_u64)
+  end
+
   it "validates Int64 chromosome lengths at writer creation" do
     path = File.join(Dir.tempdir, "d4-crystal-int64-chromosomes-#{Random.rand(1_000_000)}.d4")
     begin

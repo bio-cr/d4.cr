@@ -41,7 +41,7 @@ module D4
       header = Bytes.new(8)
       @source.read_exact_at(entry.offset, header)
       count = Format::Endian.u64_le(header, 0)
-      raise CorruptIndexError.new("SFI size mismatch") unless count <= Int64::MAX // ENTRY_SIZE && entry.size == 8 + count.to_i64 * ENTRY_SIZE
+      raise CorruptIndexError.new("SFI size mismatch") unless count <= (Int64::MAX - 8) // ENTRY_SIZE && entry.size == 8 + count.to_i64 * ENTRY_SIZE
       @count = count.to_i64
       @cached_entries = nil.as(Bytes?)
       @flag_first = @count > 0 ? detect_flag_first : false
