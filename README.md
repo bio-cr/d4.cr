@@ -2,6 +2,7 @@
 
 [![test](https://github.com/bio-cr/d4.cr/actions/workflows/test.yml/badge.svg)](https://github.com/bio-cr/d4.cr/actions/workflows/test.yml)
 [![Lines of Code](https://img.shields.io/endpoint?url=https%3A%2F%2Ftokei.kojix2.net%2Fbadge%2Fgithub%2Fbio-cr%2Fd4.cr%2Flines)](https://tokei.kojix2.net/github/bio-cr/d4.cr)
+[![DOI](https://zenodo.org/badge/1413142768.svg)](https://doi.org/10.5281/zenodo.24074199)
 
 d4.cr is a Crystal library for [D4](https://github.com/38/d4-format) files. It reads local and remote files, including files with multiple tracks, and writes single-track files.
 
