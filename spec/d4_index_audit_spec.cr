@@ -135,7 +135,7 @@ describe "D4 index relocation and integer boundaries" do
     begin
       audit_secondary_chain(path)
       expected = [0, 7, 0, 9, 0, 0, 0, 0, 0, 0]
-      D4.open(path) { |file| file.values("chr").should eq(expected) }
+      D4.open(path, &.values("chr").should(eq(expected)))
       D4.build_indexes(path)
       D4.open(path) do |file|
         file.values("chr").should eq(expected)

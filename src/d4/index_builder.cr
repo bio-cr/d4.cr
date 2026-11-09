@@ -95,8 +95,8 @@ module D4
           control.check!
           output.seek(directory.offset, IO::Seek::Set)
           output.write(Format.bytes(DirectoryEncoder.build(directory.offset, root_items)))
-          ancestor_patches.each do |offset, bytes|
-            output.seek(offset, IO::Seek::Set)
+          ancestor_patches.each do |patch_offset, bytes|
+            output.seek(patch_offset, IO::Seek::Set)
             output.write(bytes)
           end
           output.flush
